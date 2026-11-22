@@ -46,6 +46,7 @@ const paths = {
   undo:'<path d="m8 4-5 5 5 5M3 9h11a6 6 0 0 1 0 12"/>',
   close:'<path d="m6 6 12 12M18 6 6 18"/>',
   gear:'<circle cx="12" cy="12" r="3.4"/><path d="m9.5 3-.7 2.1-2 .9-2.1-.8-2 3.4 1.6 1.5v2.4L2.7 14l2 3.4 2.1-.8 2 .9.7 2.1h4l.7-2.1 2-.9 2.1.8 2-3.4-1.6-1.5v-2.4l1.6-1.5-2-3.4-2.1.8-2-.9-.7-2.1Z"/>',
+  download:'<path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/>',
 
 };
 const icon = name => '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24">' + paths[name] + '</svg>';
@@ -356,18 +357,46 @@ function desktopRail() {
   return '<aside class="desktop-rail"><button class="desktop-brand" data-act="nav-home" aria-label="kechess">' +
     '<img src="icon.png" width="44" height="44" alt=""><span>kechess</span></button>' +
     '<nav aria-label="' + text('Navigation', 'Разделы') + '">' + items.map(button).join('') + '</nav>' +
-    '<div class="rail-footer">' + button(['profile', 'nav-profile', 'user', text('Profile', 'Профиль')]) + '</div></aside>';
+    '<div class="rail-footer"><a class="rail-item" href="kechess-1.5.apk" download>' + icon('download') +
+    '<span>' + text('Download for Android','Скачать для Android') + '</span></a>' +
+    button(['profile', 'nav-profile', 'user', text('Profile', 'Профиль')]) + '</div></aside>';
+}
+
+function previewSquares(position, accent = '') {
+  return position.map((rank,y) =>
+    Array.from(rank, (piece,x) => {
+      const type = piece.toLowerCase();
+      const model = pieces[type] && {type,color:piece === type ? 'b' : 'w'};
+      const highlighted = accent === files[x] + (8-y);
+      return '<div class="showcase-cell' + ((x+y)%2 ? ' dark' : '') + (highlighted ? ' lit' : '') + '">' +
+        (model ? '<img src="' + boardPiecePath(model,'classic') + '" alt="">' : '') + '</div>';
+    }).join('')).join('');
 }
 
 function showcaseBoard() {
   const position = ['r.bqkbnr','.ppp.ppp','p.n.....','.B..p...','....P...','.....N..','PPPP.PPP','RNBQK..R'];
-  return '<div class="showcase" aria-hidden="true"><div class="showcase-board">' + position.map((rank,y) =>
-    Array.from(rank, (piece,x) => {
-      const type = piece.toLowerCase();
-      const model = pieces[type] && {type,color:piece === type ? 'b' : 'w'};
-      return '<div class="showcase-cell' + ((x+y)%2 ? ' dark' : '') + (x === 4 && y === 4 ? ' lit' : '') + '">' +
-        (model ? '<img src="' + boardPiecePath(model,'classic') + '" alt="">' : '') + '</div>';
-    }).join('')).join('') + '</div></div>';
+  return '<div class="showcase" aria-hidden="true"><div class="showcase-board">' +
+    previewSquares(position,'e4') + '</div></div>';
+}
+
+function dailyPuzzleCard() {
+  const now = new Date();
+  const date = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const id = Math.floor(date / 86400000) % puzzles.length;
+  const puzzle = puzzles[id];
+  const [fen, side] = puzzle.fen.split(' ');
+  const position = fen.split('/').map(rank => rank.replace(/[1-8]/g, count => '.'.repeat(Number(count))));
+  if (side === 'b') {
+    position.reverse();
+    position.forEach((rank,index) => { position[index] = [...rank].reverse().join(''); });
+  }
+  const completed = solved.includes(id);
+  const turn = side === 'w' ? text('White to move','Ход белых') : text('Black to move','Ход чёрных');
+  return '<section class="daily-puzzle" aria-labelledby="daily-title"><div class="daily-board" aria-hidden="true">' +
+    previewSquares(position) + '</div><div class="daily-copy"><h2 id="daily-title">' + text('Daily puzzle','Задача дня') +
+    '</h2><p>' + puzzleTitle(puzzle.count) + ' · ' + (completed ? text('Solved','Решено') : turn) +
+    '</p></div><button class="daily-play" data-act="puzzle" data-id="' + id + '">' +
+    (completed ? text('Play again','Решить снова') : text('Solve puzzle','Решить задачу')) + '</button></section>';
 }
 
 function desktopHome(canResume) {
@@ -378,14 +407,15 @@ function desktopHome(canResume) {
   ];
   return '<main class="desktop-home"><section class="desktop-hero" aria-labelledby="desktop-title"><div class="desktop-hero-copy">' +
     '<h1 id="desktop-title">' + text('Your next move.', 'Твой следующий ход.') + '</h1>' +
-    '<p>' + text('Play a game, sharpen your tactics, or invite a friend to the board.', 'Сыграй партию, потренируй тактику или пригласи друга за доску.') + '</p>' +
-    '<div class="desktop-hero-actions"><button class="desktop-play" data-act="play-menu">' + icon('play') +
-    text('Play chess', 'Сыграть в шахматы') + '</button>' +
-    (canResume ? '<button class="desktop-resume" data-act="resume">' + text('Resume game', 'Продолжить партию') + '</button>' : '') +
+    '<p>' + text('Play chess in your browser. Start with a bot, or invite a friend to the board.', 'Играй в шахматы прямо в браузере. Начни с бота или пригласи друга за доску.') + '</p>' +
+    '<div class="desktop-hero-actions"><button class="desktop-play" data-act="' + (canResume ? 'resume' : 'quick-play') + '">' + icon('play') +
+    (canResume ? text('Resume game', 'Продолжить партию') : text('Play now', 'Играть сейчас')) + '</button>' +
+    '<button class="desktop-mode-menu" data-act="play-menu">' + text('Game modes', 'Режимы игры') + '</button>' +
     '</div></div>' + showcaseBoard() + '</section><div class="desktop-modes">' +
     modes.map(([action, glyph, title, description]) =>
       '<button type="button" class="desktop-mode" data-act="' + action + '"><span class="mode-icon">' + icon(glyph) +
-      '</span><span><strong>' + title + '</strong><small>' + description + '</small></span></button>').join('') + '</div></main>';
+      '</span><span><strong>' + title + '</strong><small>' + description + '</small></span></button>').join('') + '</div>' +
+    dailyPuzzleCard() + '</main>';
 }
 
 function render() {
@@ -418,7 +448,7 @@ function render() {
     content = ('<main class="page"><h1>' + text('Profile</h1><div class="panel glass"><h2>Guest mode', 'Профиль</h1><div class="panel glass"><h2>Гостевой режим') + '</h2>') +
       ('<p class="muted">' + text('Settings and game history are stored on this device.', 'Настройки и история хранятся на этом устройстве.') + '</p></div>') +
       row('settings',text("Settings", "Настройки"),'gear') +
-      '<a class="glass row android-link" href="kechess-1.5.apk" download>' + icon('next') +
+      '<a class="glass row android-link" href="kechess-1.5.apk" download>' + icon('download') +
       '<span>' + text('Download for Android', 'Скачать для Android') + '</span></a>' +
       ('<div class="glass panel"><p class="muted">' + text('Games played · ', 'Сыграно партий · ')) + history.length + ('<br>' + text('Puzzles solved · ', 'Решено задач · ')) +
       solved.length + text(" of ", " из ") + puzzles.length + '</p></div></main>';
@@ -1227,6 +1257,7 @@ function handle(button) {
   if (act.startsWith('nav-')) { page = act.slice(4); render(); return; }
   switch (act) {
     case 'close': closeDialog(); break;
+    case 'quick-play': start('cpu',{bot:'mira',format:defaultFormat,side:'w'}); break;
     case 'play-menu':
       pop(text("Play", "Играть"),'<div class="play-options">' + row('online',text("Online with a friend", "Онлайн с другом"),'play') +
         row('local',text("Two players on one device", "Вдвоём на одном устройстве"),'user') + row('computer',text("Vs. bot", "С ботом"),'bot') + '</div>');
@@ -1398,20 +1429,23 @@ function revealApp() {
   setTimeout(() => splash.remove(),reducedMotion.matches ? 0 : 720);
 }
 function startApp() {
-  const image = new Image();
   let revealed = false;
   const ready = () => {
     if (revealed) return;
     revealed = true;
     requestAnimationFrame(revealApp);
   };
-  image.onload = () => {
-    if (typeof image.decode === 'function') image.decode().then(ready,ready);
-    else ready();
-  };
-  image.onerror = ready;
-  image.src = 'pearl-reference.png';
-  setTimeout(ready,1500);
+  if (matchMedia('(min-width: 900px)').matches) ready();
+  else {
+    const image = new Image();
+    image.onload = () => {
+      if (typeof image.decode === 'function') image.decode().then(ready,ready);
+      else ready();
+    };
+    image.onerror = ready;
+    image.src = 'pearl-reference.png';
+    setTimeout(ready,1500);
+  }
   ['w','b'].forEach(color => {
     Object.keys(pieces).forEach(type => {
       const piece = new Image();
