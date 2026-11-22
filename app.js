@@ -301,15 +301,18 @@ function openMatchSetup(mode, id) {
     (mode === 'cpu' ? '<p class="muted">' + bot.rank + '</p>' : '') + clockPicker(setup.format) + color +
     '<div class="dialog-actions">' + control('close',text("Cancel", "Отмена")) + control('start-match',text("Play", "Играть"),'play') + '</div>');
 }
-function showMoves() {
+function moveList() {
   const moves = game.chess.history();
   const rows = [];
   for (let i = 0; i < moves.length; i += 2) {
     rows.push('<div><span>' + (i/2+1) + '.</span><strong>' + escape(moves[i]) +
       '</strong><strong>' + escape(moves[i+1] || '') + '</strong></div>');
   }
-  pop(text("Moves", "Ходы"),rows.length ? '<div class="move-list">' + rows.join('') + '</div>' :
-    ('<p class="muted">' + text('Moves will appear as the game progresses.', 'Ходы появятся после начала партии.') + '</p>'));
+  return rows.length ? '<div class="move-list">' + rows.join('') + '</div>' :
+    '<p class="muted">' + text('Moves will appear as the game progresses.', 'Ходы появятся после начала партии.') + '</p>';
+}
+function showMoves() {
+  pop(text('Moves', 'Ходы'), moveList());
   dialog.insertAdjacentHTML('beforeend','<div class="dialog-actions">' +
     control('close',text("Back to board", "К доске")) + control('game-menu',text("Actions", "Действия"),'more') + '</div>');
   const list = dialog.querySelector('.move-list');
@@ -339,6 +342,52 @@ function undoMove() {
   scheduleBot();
 }
 
+function desktopRail() {
+  const items = [
+    ['home', 'nav-home', 'home', text('Home', 'Главная')],
+    ['bots', 'computer', 'bot', text('Play a bot', 'Игра с ботом')],
+    ['puzzles', 'puzzles', 'target', text('Puzzles', 'Задачи')],
+    ['history', 'nav-history', 'history', text('Games', 'Партии')],
+    ['settings', 'settings', 'gear', text('Settings', 'Настройки')],
+  ];
+  const button = ([id, action, glyph, label]) =>
+    '<button class="rail-item" data-act="' + action + '"' + (page === id ? ' aria-current="page"' : '') + '>' +
+    icon(glyph) + '<span>' + label + '</span></button>';
+  return '<aside class="desktop-rail"><button class="desktop-brand" data-act="nav-home" aria-label="kechess">' +
+    '<img src="icon.png" width="44" height="44" alt=""><span>kechess</span></button>' +
+    '<nav aria-label="' + text('Navigation', 'Разделы') + '">' + items.map(button).join('') + '</nav>' +
+    '<div class="rail-footer">' + button(['profile', 'nav-profile', 'user', text('Profile', 'Профиль')]) + '</div></aside>';
+}
+
+function showcaseBoard() {
+  const position = ['r.bqkbnr','.ppp.ppp','p.n.....','.B..p...','....P...','.....N..','PPPP.PPP','RNBQK..R'];
+  return '<div class="showcase" aria-hidden="true"><div class="showcase-board">' + position.map((rank,y) =>
+    Array.from(rank, (piece,x) => {
+      const type = piece.toLowerCase();
+      const model = pieces[type] && {type,color:piece === type ? 'b' : 'w'};
+      return '<div class="showcase-cell' + ((x+y)%2 ? ' dark' : '') + (x === 4 && y === 4 ? ' lit' : '') + '">' +
+        (model ? '<img src="' + boardPiecePath(model,'classic') + '" alt="">' : '') + '</div>';
+    }).join('')).join('') + '</div></div>';
+}
+
+function desktopHome(canResume) {
+  const modes = [
+    ['computer', 'bot', text('Play a bot', 'Игра с ботом'), text('Choose a difficulty and play at your pace.', 'Выбери уровень и играй в своём темпе.')],
+    ['online', 'user', text('Play a friend', 'Игра с другом'), text('Start a timed game with an invite link.', 'Пригласи друга по ссылке и выбери время партии.')],
+    ['puzzles', 'target', text('Chess puzzles', 'Шахматные задачи'), text('Find checkmate in one or two moves.', 'Найди мат в один или два хода.')],
+  ];
+  return '<main class="desktop-home"><section class="desktop-hero" aria-labelledby="desktop-title"><div class="desktop-hero-copy">' +
+    '<h1 id="desktop-title">' + text('Your next move.', 'Твой следующий ход.') + '</h1>' +
+    '<p>' + text('Play a game, sharpen your tactics, or invite a friend to the board.', 'Сыграй партию, потренируй тактику или пригласи друга за доску.') + '</p>' +
+    '<div class="desktop-hero-actions"><button class="desktop-play" data-act="play-menu">' + icon('play') +
+    text('Play chess', 'Сыграть в шахматы') + '</button>' +
+    (canResume ? '<button class="desktop-resume" data-act="resume">' + text('Resume game', 'Продолжить партию') + '</button>' : '') +
+    '</div></div>' + showcaseBoard() + '</section><div class="desktop-modes">' +
+    modes.map(([action, glyph, title, description]) =>
+      '<button type="button" class="desktop-mode" data-act="' + action + '"><span class="mode-icon">' + icon(glyph) +
+      '</span><span><strong>' + title + '</strong><small>' + description + '</small></span></button>').join('') + '</div></main>';
+}
+
 function render() {
   if (page === 'game') { renderGame(); return; }
   const selected = ['home','history','profile'].includes(page);
@@ -349,14 +398,15 @@ function render() {
       '<span class="tab-content">' + icon(glyph) + '<span>' + label + '</span></span></button>').join('') + '</nav>';
   let content;
   if (page === 'home') {
-    content = '<header><h1>kechess</h1><div class="header-actions">' +
+    const canResume = Boolean(read('active', null));
+    content = desktopHome(canResume) + '<header><h1>kechess</h1><div class="header-actions">' +
       ('<button class="glass circle" data-act="settings" aria-label="' + text('Settings', 'Настройки') + '">') + icon('gear') + '</button>' +
       ('<button class="glass circle" data-act="nav-profile" aria-label="' + text('Profile', 'Профиль') + '">') + icon('user') + '</button></div></header>' +
       '<div class="hero" aria-hidden="true"><div class="sculpture"></div></div>' +
       ('<button class="primary" data-act="play-menu">' + text('Play', 'Играть') + '</button>') +
       '<div class="actions">' +
       ('<button class="glass tile" data-act="computer">' + text('Vs. bot</button><button class="glass tile" data-act="puzzles">Puzzles', 'С ботом</button><button class="glass tile" data-act="puzzles">Задачи') + '</button></div>') +
-      (read('active', null) ? '<button class="glass resume-row" data-act="resume">' + icon('play') + ('<span>' + text('Resume game', 'Продолжить партию') + '</span></button>') : '');
+      (canResume ? '<button class="glass resume-row" data-act="resume">' + icon('play') + ('<span>' + text('Resume game', 'Продолжить партию') + '</span></button>') : '');
   } else if (page === 'history') {
     content = ('<main class="page"><h1>' + text('Games', 'Партии') + '</h1>') + row('local',text("Two players on one device", "Вдвоём на одном устройстве"),'user') + row('analysis',text("Game analysis", "Анализ партии"),'chart') +
       (history.length ? history.map(item =>
@@ -390,7 +440,8 @@ function render() {
           '</small></span>' + icon('next').replace('icon"', 'icon tail"') + '</button>';
       }).join('') + '</section>').join('') + '</main>';
   }
-  displayScreen('<div class="shell tab-shell' + (page === 'home' ? ' home-shell' + (read('active',null) ? ' has-resume' : '') : '') + '">' + content + nav + '</div>');
+  displayScreen('<div class="shell tab-shell' + (page === 'home' ? ' home-shell' + (read('active',null) ? ' has-resume' : '') : '') +
+    '" data-page="' + page + '">' + desktopRail() + content + nav + '</div>');
   if (page === 'home') sizeSculpture();
 }
 
@@ -519,13 +570,13 @@ function tick() {
 }
 setInterval(tick, 180);
 
-function player(color) {
+function player(color, position) {
   const p = game;
   const name = p.mode === 'local' ? colorName[color] : p.mode === 'analysis' || p.mode === 'puzzle' ? colorName[color] :
     color === p.side ? text("You", "Вы") : p.mode === 'cpu' ? p.bot.name : opponentName(p.opponent);
   const current = !p.result && p.chess.turn() === color;
   const time = clockText(times()[color === 'w' ? 0 : 1]);
-  return '<div class="glass player' + (current ? ' player-turn' : '') + '"><div class="badge">' + icon(p.mode === 'cpu' && color !== p.side ? 'bot':'user') +
+  return '<div class="glass player player-' + position + (current ? ' player-turn' : '') + '"><div class="badge">' + icon(p.mode === 'cpu' && color !== p.side ? 'bot':'user') +
     '</div><div class="name"><strong>' + escape(name) + '</strong><small>' +
     (p.mode === 'local' || p.mode === 'analysis' || p.mode === 'puzzle' ? (current ? text("To move", "Ход") : ' ') : colorName[color]) +
     '</small></div>' + (timed() ? '<div id="clock-' + color + '" class="glass clock' + (current ? ' live' : '') + '">' + time + '</div>' : '') + '</div>';
@@ -587,15 +638,20 @@ function renderGame() {
   } else {
     controls = control('moves',text("Moves", "Ходы"),'history') +
       (p.mode === 'online' ? control('draw',text("Draw", "Ничья"),'equal',true) : control('undo',text("Undo move", "Отменить ход"),'undo',true)) +
-      control('resign',text("Resign", "Сдаться"),'flag',true);
+      control('resign',text("Resign", "Сдаться"),'flag',true) +
+      '<span class="desktop-match-action">' + control('flip',text('Flip board','Повернуть доску'),'flip',true) + '</span>';
   }
   const recent = p.mode === 'analysis' && p.ply ? '<div class="glass moves"><span>' +
     p.chess.history().slice(-8).map(escape).join(' · ') + '</span><span>' + p.ply + '</span></div>' : '';
+  const movesPanel = '<section class="desktop-moves"><h2>' + text('Moves', 'Ходы') +
+    '</h2><div class="desktop-move-scroll">' + moveList() + '</div></section>';
   displayScreen(('<div class="shell game"><header><button class="glass circle" data-act="game-back" aria-label="' + text('Back', 'Назад') + '">') +
     icon('back') + '</button><h1 class="screen-title">' + escape(timed() ? formatLabel(p.format) : p.label) +
-    '</h1><div class="spacer"></div></header><main class="match">' + player(opposite(p.orientation)) + board() +
-    player(p.orientation) + '<p class="match-status" role="status">' + escape(status) + '</p>' + recent +
-    '<div class="match-controls">' + controls + '</div></main></div>');
+    '</h1><div class="spacer"></div></header><main class="match">' + player(opposite(p.orientation),'top') + board() +
+    player(p.orientation,'bottom') + '<p class="match-status" role="status">' + escape(status) + '</p>' + recent +
+    movesPanel + '<div class="match-controls">' + controls + '</div></main></div>');
+  const desktopMoveScroll = app.querySelector('.desktop-move-scroll');
+  desktopMoveScroll.scrollTop = desktopMoveScroll.scrollHeight;
   tick();
 }
 function selectSquare(square, landing) {
@@ -1176,6 +1232,7 @@ function handle(button) {
         row('local',text("Two players on one device", "Вдвоём на одном устройстве"),'user') + row('computer',text("Vs. bot", "С ботом"),'bot') + '</div>');
       break;
     case 'settings':
+      if (page === 'settings') break;
       settingsReturn = page;
       page = 'settings'; render(); break;
     case 'settings-back': settingsBack(); break;
