@@ -47,6 +47,7 @@ const paths = {
   close:'<path d="m6 6 12 12M18 6 6 18"/>',
   gear:'<circle cx="12" cy="12" r="3.4"/><path d="m9.5 3-.7 2.1-2 .9-2.1-.8-2 3.4 1.6 1.5v2.4L2.7 14l2 3.4 2.1-.8 2 .9.7 2.1h4l.7-2.1 2-.9 2.1.8 2-3.4-1.6-1.5v-2.4l1.6-1.5-2-3.4-2.1.8-2-.9-.7-2.1Z"/>',
   download:'<path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/>',
+  focus:'<path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4"/><circle cx="12" cy="12" r="2.4"/>',
 
 };
 const icon = name => '<svg class="icon" aria-hidden="true" viewBox="0 0 24 24">' + paths[name] + '</svg>';
@@ -65,6 +66,7 @@ let botTimer;
 const settings = Object.assign({},defaultBoardSettings,
   {hints:read('profile',{hints:true}).hints !== false},read('settings',{}));
 if (settings.theme !== 'custom' && !isBoardPalette(settings.theme)) settings.theme = defaultBoardSettings.theme;
+if (!isPieceStyle(settings.style)) settings.style = defaultBoardSettings.style;
 ['light','dark'].forEach(name => { if (!isBoardColor(settings[name])) settings[name] = defaultBoardSettings[name]; });
 let puzzleTimer;
 let history = read('history', []);
@@ -73,6 +75,7 @@ let solved = read('solved', []);
 
 
 let settingsReturn = 'home';
+let focusMode = false;
 
 function boardTint() {
   const {light,dark} = boardColors(settings);
@@ -104,9 +107,10 @@ function renderSettings() {
     return '<button class="glass theme-option" data-act="theme" data-id="' + id + '" aria-pressed="' + (settings.theme === id) +
       '"><span class="palette-swatch" style="--swatch-light:' + p.light + ';--swatch-dark:' + p.dark + '"></span>' + p.name + '</button>';
   }).join('');
-  const styles = [['classic',text("Classic", "Классика")],['metal',text("Metal", "Металл")]].map(([id,name]) =>
+  const styles = Object.entries(pieceStyles).map(([id,name]) =>
     '<button class="glass piece-option" data-act="piece-style" data-id="' + id + '" aria-pressed="' +
-    (settings.style === id) + '"><img alt="" src="' + boardPiecePath({color:'w',type:'n'},id) + '"><span>' + name + '</span></button>').join('');
+    (settings.style === id) + '"><img class="piece-style-' + id + '" alt="" src="' +
+    boardPiecePath({color:'w',type:'n'},id) + '"><span>' + name + '</span></button>').join('');
   const toggles = Object.keys(boardToggles).map(id =>
     '<button class="setting-toggle" data-act="board-toggle" data-id="' + id +
     '" role="switch" aria-checked="' + settings[id] + '"><span>' + boardToggles[id] + '</span><span class="setting-switch" aria-hidden="true"></span></button>'
@@ -302,12 +306,18 @@ function openMatchSetup(mode, id) {
     (mode === 'cpu' ? '<p class="muted">' + bot.rank + '</p>' : '') + clockPicker(setup.format) + color +
     '<div class="dialog-actions">' + control('close',text("Cancel", "Отмена")) + control('start-match',text("Play", "Играть"),'play') + '</div>');
 }
-function moveList() {
-  const moves = game.chess.history();
+function moveList(interactive = false) {
+  const moves = interactive ? game.review : game.chess.history();
   const rows = [];
+  const label = index => {
+    const san = escape(moves[index] || '');
+    if (!interactive || !san) return '<strong>' + san + '</strong>';
+    const ply = index + 1;
+    return '<button class="move-jump" data-act="review-ply" data-id="' + ply + '"' +
+      (game.cursor === ply ? ' aria-current="step"' : '') + '>' + san + '</button>';
+  };
   for (let i = 0; i < moves.length; i += 2) {
-    rows.push('<div><span>' + (i/2+1) + '.</span><strong>' + escape(moves[i]) +
-      '</strong><strong>' + escape(moves[i+1] || '') + '</strong></div>');
+    rows.push('<div><span>' + (i/2+1) + '.</span>' + label(i) + label(i+1) + '</div>');
   }
   return rows.length ? '<div class="move-list">' + rows.join('') + '</div>' :
     '<p class="muted">' + text('Moves will appear as the game progresses.', 'Ходы появятся после начала партии.') + '</p>';
@@ -362,21 +372,23 @@ function desktopRail() {
     button(['profile', 'nav-profile', 'user', text('Profile', 'Профиль')]) + '</div></aside>';
 }
 
-function previewSquares(position, accent = '') {
+function previewSquares(position, accent = '', arrival = '') {
   return position.map((rank,y) =>
     Array.from(rank, (piece,x) => {
       const type = piece.toLowerCase();
       const model = pieces[type] && {type,color:piece === type ? 'b' : 'w'};
-      const highlighted = accent === files[x] + (8-y);
+      const square = files[x] + (8-y);
+      const highlighted = accent === square;
       return '<div class="showcase-cell' + ((x+y)%2 ? ' dark' : '') + (highlighted ? ' lit' : '') + '">' +
-        (model ? '<img src="' + boardPiecePath(model,'classic') + '" alt="">' : '') + '</div>';
+        (model ? '<img' + (settings.motion && square === arrival ? ' class="showcase-arrival"' : '') +
+          ' src="' + boardPiecePath(model,arrival ? 'metal' : 'classic') + '" alt="">' : '') + '</div>';
     }).join('')).join('');
 }
 
 function showcaseBoard() {
   const position = ['r.bqkbnr','.ppp.ppp','p.n.....','.B..p...','....P...','.....N..','PPPP.PPP','RNBQK..R'];
   return '<div class="showcase" aria-hidden="true"><div class="showcase-board">' +
-    previewSquares(position,'e4') + '</div></div>';
+    previewSquares(position,'f3','f3') + '</div></div>';
 }
 
 function dailyPuzzleCard() {
@@ -612,7 +624,7 @@ function player(color, position) {
     '</small></div>' + (timed() ? '<div id="clock-' + color + '" class="glass clock' + (current ? ' live' : '') + '">' + time + '</div>' : '') + '</div>';
 }
 function pieceImage(piece) {
-  return '<img alt="" class="piece ' + (piece.color === 'w' ? 'white' : 'black') + '" draggable="false" src="' +
+  return '<img alt="" class="piece piece-style-' + settings.style + ' ' + (piece.color === 'w' ? 'white' : 'black') + '" draggable="false" src="' +
     boardPiecePath(piece,settings.style) + '">';
 }
 function board() {
@@ -673,15 +685,26 @@ function renderGame() {
   }
   const recent = p.mode === 'analysis' && p.ply ? '<div class="glass moves"><span>' +
     p.chess.history().slice(-8).map(escape).join(' · ') + '</span><span>' + p.ply + '</span></div>' : '';
+  const previousMoves = app.querySelector('.desktop-move-scroll');
+  const previousScroll = previousMoves ? previousMoves.scrollTop : 0;
+  const following = !previousMoves || previousMoves.scrollHeight - previousScroll - previousMoves.clientHeight < 24;
   const movesPanel = '<section class="desktop-moves"><h2>' + text('Moves', 'Ходы') +
-    '</h2><div class="desktop-move-scroll">' + moveList() + '</div></section>';
-  displayScreen(('<div class="shell game"><header><button class="glass circle" data-act="game-back" aria-label="' + text('Back', 'Назад') + '">') +
+    '</h2><div class="desktop-move-scroll">' + moveList(Boolean(p.review)) + '</div></section>';
+  const focusLabel = focusMode ? text('Exit focus','Выйти из фокуса') : text('Focus mode','Режим фокуса');
+  displayScreen(('<div class="shell game' + (focusMode ? ' game-focus' : '') + '"><header><button class="glass circle" data-act="game-back" aria-label="' + text('Back', 'Назад') + '">') +
     icon('back') + '</button><h1 class="screen-title">' + escape(timed() ? formatLabel(p.format) : p.label) +
-    '</h1><div class="spacer"></div></header><main class="match">' + player(opposite(p.orientation),'top') + board() +
+    '</h1><div class="spacer"></div><button class="glass focus-control" data-act="game-focus" aria-pressed="' + focusMode +
+    '" aria-keyshortcuts="Z">' + icon('focus') + focusLabel + '</button></header><main class="match">' + player(opposite(p.orientation),'top') + board() +
     player(p.orientation,'bottom') + '<p class="match-status" role="status">' + escape(status) + '</p>' + recent +
     movesPanel + '<div class="match-controls">' + controls + '</div></main></div>');
   const desktopMoveScroll = app.querySelector('.desktop-move-scroll');
-  desktopMoveScroll.scrollTop = desktopMoveScroll.scrollHeight;
+  desktopMoveScroll.scrollTop = following ? desktopMoveScroll.scrollHeight : previousScroll;
+  const current = desktopMoveScroll.querySelector('[aria-current="step"]');
+  if (current && desktopMoveScroll.clientHeight > 0) {
+    const bounds = desktopMoveScroll.getBoundingClientRect();
+    const step = current.getBoundingClientRect();
+    if (step.top < bounds.top || step.bottom > bounds.bottom) desktopMoveScroll.scrollTop += step.top - bounds.top;
+  }
   tick();
 }
 function selectSquare(square, landing) {
@@ -828,7 +851,7 @@ function fadePreviousScreen(previous) {
   fade.onfinish = () => departure.remove();
 }
 
-function springFrames(x, y, vx, vy, scale, duration, toX = 0, toY = 0) {
+function springFrames(x, y, vx, vy, scale, duration, toX = 0, toY = 0, lift = 0) {
   const naturalFrequency = 9.6;
   const decay = naturalFrequency * .82;
   const frequency = Math.sqrt(naturalFrequency * naturalFrequency - decay * decay);
@@ -838,7 +861,7 @@ function springFrames(x, y, vx, vy, scale, duration, toX = 0, toY = 0) {
   for (let i = 0; i <= 32; i++) {
     const t = i * duration / 32000;
     const px = i === 32 ? toX : toX + axis(x,vx,t);
-    const py = i === 32 ? toY : toY + axis(y,vy,t);
+    const py = i === 32 ? toY : toY + axis(y,vy,t) - lift * Math.sin(Math.PI * i / 32);
     const size = i === 32 ? 1 : 1 + axis(scale-1,0,t);
     frames.push({transform:'translate3d('+px.toFixed(2)+'px,'+py.toFixed(2)+'px,0) scale('+size.toFixed(4)+')'});
   }
@@ -849,22 +872,45 @@ function squarePositions() {
   const positions = {};
   app.querySelectorAll('.square > img').forEach(img => {
     const rect = img.getBoundingClientRect();
-    positions[img.parentElement.dataset.square] = {x:rect.left,y:rect.top};
+    positions[img.parentElement.dataset.square] = {
+      x:rect.left, y:rect.top, width:rect.width, height:rect.height, src:img.src, className:img.className,
+    };
   });
   return positions;
 }
 function animateMove(move, origins, landing) {
   if (!move || !origins || reducedMotion.matches) return;
+  if (move.captured) {
+    const captureSquare = move.flags.includes('e') ? move.to[0] + move.from[1] : move.to;
+    const captured = origins[captureSquare];
+    if (captured && typeof Element.prototype.animate === 'function') {
+      const ghost = new Image();
+      ghost.src = captured.src;
+      ghost.alt = '';
+      ghost.setAttribute('aria-hidden','true');
+      ghost.className = captured.className + ' capture-ghost';
+      Object.assign(ghost.style, {left:captured.x+'px', top:captured.y+'px', width:captured.width+'px', height:captured.height+'px'});
+      document.body.appendChild(ghost);
+      const fade = ghost.animate([
+        {opacity:1,transform:'translateY(0) scale(1)'},
+        {opacity:.82,transform:'translateY(-4px) scale(1.04)',offset:.26},
+        {opacity:0,transform:'translateY(-12px) scale(.76)'},
+      ],{duration:410,easing:'cubic-bezier(.23,.68,.22,1)',fill:'both'});
+      fade.finished.then(() => ghost.remove(), () => ghost.remove());
+    }
+  }
   const slide = (from, to, release) => {
     const square = app.querySelector('[data-square="' + to + '"]');
     const img = square && square.querySelector('img');
     const origin = release || origins[from];
     if (!img || !img.animate || !origin) return;
     const destination = img.getBoundingClientRect();
-    const duration = release ? 740 : 870;
+    const isKnight = from === move.from && move.piece === 'n';
+    const duration = release ? 680 : isKnight ? 690 : 620;
+    const lift = !release && isKnight ? Math.min(17,destination.width * .22) : 0;
     square.classList.add('moving');
     const animation = img.animate(springFrames(origin.x-destination.left,origin.y-destination.top,
-      origin.vx || 0,origin.vy || 0,release ? 1.07 : 1.035,duration),{duration,easing:'linear'});
+      origin.vx || 0,origin.vy || 0,release ? 1.07 : 1.035,duration,0,0,lift),{duration,easing:'linear'});
     const rest = () => {
       const current = img.parentElement;
       if (current) current.classList.remove('moving');
@@ -1280,7 +1326,7 @@ function handle(button) {
       }
       break;
     case 'piece-style':
-      settings.style = button.dataset.id === 'metal' ? 'metal' : 'classic';
+      if (isPieceStyle(button.dataset.id)) settings.style = button.dataset.id;
       applyBoardSettings();
       break;
     case 'board-toggle':
@@ -1344,6 +1390,12 @@ function handle(button) {
     case 'record': review(history.find(item => item.id === button.dataset.id).pgn); break;
     case 'previous': seek(game.cursor-1); break;
     case 'forward': seek(game.cursor+1); break;
+    case 'review-ply': if (game.review) seek(Number(button.dataset.id)); break;
+    case 'game-focus':
+      focusMode = !focusMode;
+      render();
+      app.querySelector('[data-act="game-focus"]').focus({preventScroll:true});
+      break;
     case 'undo': undoMove(); break;
     case 'create-room': {
       const number = crypto.getRandomValues(new Uint32Array(1))[0] % 90000000 + 10000000;
@@ -1394,7 +1446,18 @@ document.addEventListener('click', event => {
 });
 overlay.addEventListener('click', event => { if (event.target === overlay) dismissDialog(); });
 document.addEventListener('keydown', event => {
-  if (!dialogVisible) return;
+  if (!dialogVisible) {
+    if (page !== 'game' || event.repeat || event.ctrlKey || event.metaKey || event.altKey ||
+      (event.target instanceof Element && event.target.closest('input,textarea,select,[contenteditable="true"]'))) return;
+    if (event.key.toLowerCase() === 'z' && matchMedia('(min-width: 900px)').matches) {
+      event.preventDefault();
+      handle(app.querySelector('[data-act="game-focus"]'));
+    } else if (game.review && ['ArrowLeft','ArrowRight'].includes(event.key)) {
+      event.preventDefault();
+      seek(game.cursor + (event.key === 'ArrowLeft' ? -1 : 1));
+    }
+    return;
+  }
   if (event.key === 'Escape') { event.preventDefault(); dismissDialog(); }
   if (event.key !== 'Tab') return;
   const items = Array.from(dialog.querySelectorAll('button:not([disabled]),input,textarea,select'));
