@@ -1,6 +1,7 @@
 'use strict';
 
 const boardPalettes = {
+  frost:{get name() { return text('Frost', 'Иней'); },light:'#cbd8e6',dark:'#587495'},
   pearl:{get name() { return text("Pearl", "Жемчуг"); },light:'#e6e1df',dark:'#a5a3a1'},
   wood:{get name() { return text("Wood", "Дерево"); },light:'#f2dcba',dark:'#a4744c'},
   olive:{get name() { return text("Olive", "Олива"); },light:'#e7ebcd',dark:'#799169'},
@@ -10,7 +11,7 @@ const boardPalettes = {
   cognac:{get name() { return text('Cognac', 'Коньяк'); },light:'#eedbc2',dark:'#9e725d'},
 };
 const defaultBoardSettings = {
-  theme:'pearl', style:'classic', light:'#e6e1df', dark:'#a5a3a1',
+  theme:'frost', style:'classic', light:'#cbd8e6', dark:'#587495',
   coordinates:true, hints:true, lastMove:true, motion:true,
 };
 const boardToggles = {

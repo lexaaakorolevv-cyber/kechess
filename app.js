@@ -353,7 +353,7 @@ function undoMove() {
   scheduleBot();
 }
 
-function desktopRail() {
+function siteNavigation() {
   const items = [
     ['home', 'nav-home', 'home', text('Home', 'Главная')],
     ['bots', 'computer', 'bot', text('Play a bot', 'Игра с ботом')],
@@ -364,31 +364,23 @@ function desktopRail() {
   const button = ([id, action, glyph, label]) =>
     '<button class="rail-item" data-act="' + action + '"' + (page === id ? ' aria-current="page"' : '') + '>' +
     icon(glyph) + '<span>' + label + '</span></button>';
-  return '<aside class="desktop-rail"><button class="desktop-brand" data-act="nav-home" aria-label="kechess">' +
-    '<img src="icon.png" width="44" height="44" alt=""><span>kechess</span></button>' +
-    '<nav aria-label="' + text('Navigation', 'Разделы') + '">' + items.map(button).join('') + '</nav>' +
-    '<div class="rail-footer"><a class="rail-item" href="kechess-1.5.apk" download>' + icon('download') +
-    '<span>' + text('Download for Android','Скачать для Android') + '</span></a>' +
-    button(['profile', 'nav-profile', 'user', text('Profile', 'Профиль')]) + '</div></aside>';
+  return '<header class="site-nav"><button class="site-brand" data-act="nav-home" aria-label="kechess">' +
+    '<img src="icon.png" width="36" height="36" alt=""><span>kechess</span></button>' +
+    '<nav class="site-links" aria-label="' + text('Navigation', 'Разделы') + '">' + items.slice(0,4).map(button).join('') + '</nav>' +
+    '<div class="site-utilities"><a class="rail-item apk-link" href="kechess-1.5.apk" download aria-label="' +
+    text('Download for Android','Скачать для Android') + '">' + icon('download') +
+    '<span>Android</span></a>' + button(items[4]) +
+    button(['profile', 'nav-profile', 'user', text('Profile', 'Профиль')]) + '</div></header>';
 }
 
-function previewSquares(position, accent = '', arrival = '') {
+function previewSquares(position) {
   return position.map((rank,y) =>
     Array.from(rank, (piece,x) => {
       const type = piece.toLowerCase();
       const model = pieces[type] && {type,color:piece === type ? 'b' : 'w'};
-      const square = files[x] + (8-y);
-      const highlighted = accent === square;
-      return '<div class="showcase-cell' + ((x+y)%2 ? ' dark' : '') + (highlighted ? ' lit' : '') + '">' +
-        (model ? '<img' + (settings.motion && square === arrival ? ' class="showcase-arrival"' : '') +
-          ' src="' + boardPiecePath(model,arrival ? 'metal' : 'classic') + '" alt="">' : '') + '</div>';
+      return '<div class="showcase-cell' + ((x+y)%2 ? ' dark' : '') + '">' +
+        (model ? '<img src="' + boardPiecePath(model,settings.style) + '" alt="">' : '') + '</div>';
     }).join('')).join('');
-}
-
-function showcaseBoard() {
-  const position = ['r.bqkbnr','.ppp.ppp','p.n.....','.B..p...','....P...','.....N..','PPPP.PPP','RNBQK..R'];
-  return '<div class="showcase" aria-hidden="true"><div class="showcase-board">' +
-    previewSquares(position,'f3','f3') + '</div></div>';
 }
 
 function dailyPuzzleCard() {
@@ -404,10 +396,10 @@ function dailyPuzzleCard() {
   }
   const completed = solved.includes(id);
   const turn = side === 'w' ? text('White to move','Ход белых') : text('Black to move','Ход чёрных');
-  return '<section class="daily-puzzle" aria-labelledby="daily-title"><div class="daily-board" aria-hidden="true">' +
-    previewSquares(position) + '</div><div class="daily-copy"><h2 id="daily-title">' + text('Daily puzzle','Задача дня') +
+  return '<section class="daily-puzzle" aria-labelledby="daily-title"><div class="daily-copy"><h2 id="daily-title">' + text('Daily puzzle','Задача дня') +
     '</h2><p>' + puzzleTitle(puzzle.count) + ' · ' + (completed ? text('Solved','Решено') : turn) +
-    '</p></div><button class="daily-play" data-act="puzzle" data-id="' + id + '">' +
+    '</p></div><div class="daily-board" aria-hidden="true">' + previewSquares(position) + '</div>' +
+    '<button class="daily-play" data-act="puzzle" data-id="' + id + '">' +
     (completed ? text('Play again','Решить снова') : text('Solve puzzle','Решить задачу')) + '</button></section>';
 }
 
@@ -417,17 +409,16 @@ function desktopHome(canResume) {
     ['online', 'user', text('Play a friend', 'Игра с другом'), text('Start a timed game with an invite link.', 'Пригласи друга по ссылке и выбери время партии.')],
     ['puzzles', 'target', text('Chess puzzles', 'Шахматные задачи'), text('Find checkmate in one or two moves.', 'Найди мат в один или два хода.')],
   ];
-  return '<main class="desktop-home"><section class="desktop-hero" aria-labelledby="desktop-title"><div class="desktop-hero-copy">' +
-    '<h1 id="desktop-title">' + text('Your next move.', 'Твой следующий ход.') + '</h1>' +
-    '<p>' + text('Play chess in your browser. Start with a bot, or invite a friend to the board.', 'Играй в шахматы прямо в браузере. Начни с бота или пригласи друга за доску.') + '</p>' +
+  return '<main class="desktop-home"><div class="home-feature"><section class="desktop-hero" aria-labelledby="desktop-title"><div class="desktop-hero-copy">' +
+    '<h1 id="desktop-title">' + text('Chess, on your terms.', 'Шахматы в твоём ритме.') + '</h1>' +
+    '<p>' + text('Play a blitz game, train with 72 puzzles, or invite a friend. Right in your browser.', 'Сыграй блиц, решай 72 задачи или пригласи друга. Прямо в браузере.') + '</p>' +
     '<div class="desktop-hero-actions"><button class="desktop-play" data-act="' + (canResume ? 'resume' : 'quick-play') + '">' + icon('play') +
     (canResume ? text('Resume game', 'Продолжить партию') : text('Play now', 'Играть сейчас')) + '</button>' +
     '<button class="desktop-mode-menu" data-act="play-menu">' + text('Game modes', 'Режимы игры') + '</button>' +
-    '</div></div>' + showcaseBoard() + '</section><div class="desktop-modes">' +
+    '</div></div><div class="hero-art" aria-hidden="true"></div></section>' + dailyPuzzleCard() + '</div><div class="desktop-modes">' +
     modes.map(([action, glyph, title, description]) =>
       '<button type="button" class="desktop-mode" data-act="' + action + '"><span class="mode-icon">' + icon(glyph) +
-      '</span><span><strong>' + title + '</strong><small>' + description + '</small></span></button>').join('') + '</div>' +
-    dailyPuzzleCard() + '</main>';
+      '</span><span><strong>' + title + '</strong><small>' + description + '</small></span></button>').join('') + '</div></main>';
 }
 
 function render() {
@@ -440,30 +431,26 @@ function render() {
       '<span class="tab-content">' + icon(glyph) + '<span>' + label + '</span></span></button>').join('') + '</nav>';
   let content;
   if (page === 'home') {
-    const canResume = Boolean(read('active', null));
-    content = desktopHome(canResume) + '<header><h1>kechess</h1><div class="header-actions">' +
-      ('<button class="glass circle" data-act="settings" aria-label="' + text('Settings', 'Настройки') + '">') + icon('gear') + '</button>' +
-      ('<button class="glass circle" data-act="nav-profile" aria-label="' + text('Profile', 'Профиль') + '">') + icon('user') + '</button></div></header>' +
-      '<div class="hero" aria-hidden="true"><div class="sculpture"></div></div>' +
-      ('<button class="primary" data-act="play-menu">' + text('Play', 'Играть') + '</button>') +
-      '<div class="actions">' +
-      ('<button class="glass tile" data-act="computer">' + text('Vs. bot</button><button class="glass tile" data-act="puzzles">Puzzles', 'С ботом</button><button class="glass tile" data-act="puzzles">Задачи') + '</button></div>') +
-      (canResume ? '<button class="glass resume-row" data-act="resume">' + icon('play') + ('<span>' + text('Resume game', 'Продолжить партию') + '</span></button>') : '');
+    content = desktopHome(Boolean(read('active', null)));
   } else if (page === 'history') {
-    content = ('<main class="page"><h1>' + text('Games', 'Партии') + '</h1>') + row('local',text("Two players on one device", "Вдвоём на одном устройстве"),'user') + row('analysis',text("Game analysis", "Анализ партии"),'chart') +
+    content = ('<main class="page history-page"><h1>' + text('Games', 'Партии') + '</h1>') +
+      '<div class="page-actions">' + row('local',text("Two players on one device", "Вдвоём на одном устройстве"),'user') + row('analysis',text("Game analysis", "Анализ партии"),'chart') + '</div>' +
+      '<h2 class="section-title">' + text('Game history','История партий') + '</h2>' +
       (history.length ? history.map(item =>
         '<button class="glass row" data-act="record" data-id="' + item.id + '"><span class="record"><span><strong>' +
         escape(historyLabel(item.label)) + '</strong><small>' + escape(translateResult(item.result)) + ' · ' + item.moves +
         (text(' half-moves', ' полуходов') + '</small></span><small>') + new Date(item.time).toLocaleDateString(text("en-US", "ru-RU")) +
         '</small></span></button>').join('') : ('<p class="muted panel glass">' + text('Completed games will appear here.', 'Здесь появятся завершённые партии.') + '</p>')) + '</main>';
   } else if (page === 'profile') {
-    content = ('<main class="page"><h1>' + text('Profile</h1><div class="panel glass"><h2>Guest mode', 'Профиль</h1><div class="panel glass"><h2>Гостевой режим') + '</h2>') +
-      ('<p class="muted">' + text('Settings and game history are stored on this device.', 'Настройки и история хранятся на этом устройстве.') + '</p></div>') +
-      row('settings',text("Settings", "Настройки"),'gear') +
-      '<a class="glass row android-link" href="kechess-1.5.apk" download>' + icon('download') +
-      '<span>' + text('Download for Android', 'Скачать для Android') + '</span></a>' +
-      ('<div class="glass panel"><p class="muted">' + text('Games played · ', 'Сыграно партий · ')) + history.length + ('<br>' + text('Puzzles solved · ', 'Решено задач · ')) +
-      solved.length + text(" of ", " из ") + puzzles.length + '</p></div></main>';
+    content = '<main class="page profile-page"><h1>' + text('Profile','Профиль') + '</h1>' +
+      '<section class="profile-overview glass"><div class="profile-icon">' + icon('user') + '</div><div><h2>' +
+      text('Guest mode','Гостевой режим') + '</h2><p class="muted">' +
+      text('Settings and game history are stored on this device.', 'Настройки и история хранятся на этом устройстве.') + '</p></div></section>' +
+      '<dl class="profile-stats"><div class="glass"><dt>' + text('Games played','Сыграно партий') + '</dt><dd>' + history.length +
+      '</dd></div><div class="glass"><dt>' + text('Puzzles solved','Решено задач') + '</dt><dd>' + solved.length + ' <small>/ ' + puzzles.length +
+      '</small></dd></div></dl><div class="page-actions">' + row('settings',text('Settings','Настройки'),'gear') +
+      '<a class="glass row android-link" href="kechess-1.5.apk" download>' + icon('download') + '<span>' +
+      text('Download for Android','Скачать для Android') + '</span></a></div></main>';
   } else if (page === 'settings') {
     content = renderSettings();
   } else if (page === 'bots') {
@@ -482,9 +469,7 @@ function render() {
           '</small></span>' + icon('next').replace('icon"', 'icon tail"') + '</button>';
       }).join('') + '</section>').join('') + '</main>';
   }
-  displayScreen('<div class="shell tab-shell' + (page === 'home' ? ' home-shell' + (read('active',null) ? ' has-resume' : '') : '') +
-    '" data-page="' + page + '">' + desktopRail() + content + nav + '</div>');
-  if (page === 'home') sizeSculpture();
+  displayScreen('<div class="shell tab-shell" data-page="' + page + '">' + siteNavigation() + content + nav + '</div>');
 }
 
 function newGame(mode, options = {}) {
@@ -1489,26 +1474,10 @@ function revealApp() {
     dialog.querySelector('#room').value = code;
   }
   splash.classList.add('boot-ready');
-  setTimeout(() => splash.remove(),reducedMotion.matches ? 0 : 720);
+  setTimeout(() => splash.remove(),reducedMotion.matches ? 0 : 440);
 }
 function startApp() {
-  let revealed = false;
-  const ready = () => {
-    if (revealed) return;
-    revealed = true;
-    requestAnimationFrame(revealApp);
-  };
-  if (matchMedia('(min-width: 900px)').matches) ready();
-  else {
-    const image = new Image();
-    image.onload = () => {
-      if (typeof image.decode === 'function') image.decode().then(ready,ready);
-      else ready();
-    };
-    image.onerror = ready;
-    image.src = 'pearl-reference.png';
-    setTimeout(ready,1500);
-  }
+  requestAnimationFrame(revealApp);
   ['w','b'].forEach(color => {
     Object.keys(pieces).forEach(type => {
       const piece = new Image();
@@ -1516,14 +1485,5 @@ function startApp() {
     });
   });
 }
-
-function sizeSculpture() {
-  const hero = app.querySelector('.hero');
-  if (!hero) return;
-  const {clientWidth, clientHeight} = hero;
-  hero.firstElementChild.style.width = Math.floor(Math.min(clientWidth, clientHeight * 545 / 346, 550)) + 'px';
-}
-
-window.addEventListener('resize', sizeSculpture);
 
 startApp();
